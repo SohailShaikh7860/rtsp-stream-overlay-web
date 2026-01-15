@@ -20,6 +20,19 @@ def create_stream():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
+    if not stream_service.wait_for_playlist(stream_id):
+        log_path = stream_service.get_stream_log_path(stream_id)
+        stream_service.stop_stream(stream_id)
+        return (
+            jsonify(
+                {
+                    "error": "Stream failed to start. Check RTSP URL.",
+                    "log_path": str(log_path) if log_path else None,
+                }
+            ),
+            500,
+        )
+
     base_url = request.host_url.rstrip("/")
     hls_url = f"{base_url}/streams/{stream_id}/index.m3u8"
     return jsonify({"id": stream_id, "hls_url": hls_url}), 201
@@ -39,4 +52,17 @@ def serve_stream_file(stream_id, filename):
     if not stream_dir:
         return jsonify({"error": "Stream not found"}), 404
 
-    return send_from_directory(stream_dir, filename)
+    response = send_from_directory(stream_dir, filename)
+    
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    
+    if filename.endswith('.m3u8'):
+        response.headers['Content-Type'] = 'application/vnd.apple.mpegurl'
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    elif filename.endswith('.ts'):
+        response.headers['Content-Type'] = 'video/mp2t'
+        response.headers['Cache-Control'] = 'public, max-age=31536000'
+    
+    return response
