@@ -34,6 +34,32 @@ function App() {
   )
 
   useEffect(() => {
+    const loadOverlays = async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/overlays`)
+        if (response.ok) {
+          const data = await response.json()
+          const loadedOverlays = data.map((overlay) => ({
+            id: overlay.id,
+            x: overlay.position?.x || 24,
+            y: overlay.position?.y || 24,
+            width: overlay.size?.width || 180,
+            height: overlay.size?.height || 60,
+            type: overlay.type,
+            content: overlay.content,
+            style: overlay.style || { color: '#ffffff', fontSize: 18 },
+          }))
+          setOverlays(loadedOverlays)
+          console.log(`Loaded ${loadedOverlays.length} overlays from database`)
+        }
+      } catch (error) {
+        console.error('Failed to load overlays:', error)
+      }
+    }
+    loadOverlays()
+  }, [])
+
+  useEffect(() => {
     const handlePointerMove = (event) => {
       const interaction = interactionRef.current
       if (!interaction || !stageRef.current) {
@@ -74,6 +100,9 @@ function App() {
     }
 
     const handlePointerUp = () => {
+      if (interactionRef.current) {
+        saveOverlayToDatabase(interactionRef.current.id)
+      }
       interactionRef.current = null
     }
 
@@ -217,7 +246,7 @@ function App() {
     }
   }, [videoUrl])
 
-  const handleCreateOverlay = () => {
+  const handleCreateOverlay = async () => {
     const trimmedText = newOverlayText.trim()
     const trimmedImage = newOverlayImage.trim()
 
@@ -228,28 +257,63 @@ function App() {
       return
     }
 
-    const baseOverlay = {
-      id: `${Date.now()}-${Math.round(Math.random() * 1000)}`,
-      x: 24,
-      y: 24,
-      width: 180,
-      height: 60,
+    const overlayData = {
+      name: newOverlayType === 'text' ? trimmedText : 'Image Overlay',
       type: newOverlayType,
       content: newOverlayType === 'text' ? trimmedText : trimmedImage,
-      style: {
-        color: '#ffffff',
-        fontSize: 18,
-      },
+      position: { x: 24, y: 24 },
+      size: { width: 180, height: 60 },
+      style: { color: '#ffffff', fontSize: 18 },
     }
 
-    setOverlays((prev) => [...prev, baseOverlay])
-    setSelectedId(baseOverlay.id)
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/overlays`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(overlayData),
+      })
+
+      if (response.ok) {
+        const savedOverlay = await response.json()
+        
+        const newOverlay = {
+          id: savedOverlay.id,
+          x: savedOverlay.position.x,
+          y: savedOverlay.position.y,
+          width: savedOverlay.size.width,
+          height: savedOverlay.size.height,
+          type: savedOverlay.type,
+          content: savedOverlay.content,
+          style: savedOverlay.style,
+        }
+
+        setOverlays((prev) => [...prev, newOverlay])
+        setSelectedId(newOverlay.id)
+        console.log('Overlay saved to database:', savedOverlay.id)
+      } else {
+        console.error('Failed to save overlay')
+      }
+    } catch (error) {
+      console.error('Error creating overlay:', error)
+    }
   }
 
-  const handleRemoveOverlay = (overlayId) => {
-    setOverlays((prev) => prev.filter((overlay) => overlay.id !== overlayId))
-    if (selectedId === overlayId) {
-      setSelectedId(null)
+  const handleRemoveOverlay = async (overlayId) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/overlays/${overlayId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setOverlays((prev) => prev.filter((overlay) => overlay.id !== overlayId))
+        if (selectedId === overlayId) {
+          setSelectedId(null)
+        }
+      } else {
+        console.error('Failed to delete overlay')
+      }
+    } catch (error) {
+      console.error('Error deleting overlay:', error)
     }
   }
 
@@ -259,6 +323,28 @@ function App() {
         overlay.id === overlayId ? { ...overlay, ...updates } : overlay,
       ),
     )
+  }
+
+  const saveOverlayToDatabase = async (overlayId) => {
+    const overlay = overlays.find((o) => o.id === overlayId)
+    if (!overlay) return
+
+    try {
+      const updateData = {
+        position: { x: overlay.x, y: overlay.y },
+        size: { width: overlay.width, height: overlay.height },
+        content: overlay.content,
+        style: overlay.style,
+      }
+
+      await fetch(`${BACKEND_URL}/api/overlays/${overlayId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
+      })
+    } catch (error) {
+      console.error('Error saving overlay:', error)
+    }
   }
 
   const handleLoadHls = () => {
@@ -372,6 +458,7 @@ function App() {
             onCreateOverlay={handleCreateOverlay}
             selectedOverlay={selectedOverlay}
             onUpdateOverlay={updateOverlay}
+            onSaveOverlay={saveOverlayToDatabase}
             onRemoveOverlay={handleRemoveOverlay}
             overlays={overlays}
             selectedId={selectedId}
