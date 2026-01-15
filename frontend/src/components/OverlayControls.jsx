@@ -8,6 +8,7 @@ function OverlayControls({
   onCreateOverlay,
   selectedOverlay,
   onUpdateOverlay,
+  onSaveOverlay,
   onRemoveOverlay,
   overlays,
   selectedId,
@@ -76,6 +77,7 @@ function OverlayControls({
                     content: event.target.value,
                   })
                 }
+                onBlur={() => onSaveOverlay(selectedOverlay.id)}
               />
             </label>
             {selectedOverlay.type === 'text' && (
@@ -85,14 +87,15 @@ function OverlayControls({
                   <input
                     type="color"
                     value={selectedOverlay.style.color}
-                    onChange={(event) =>
+                    onChange={(event) => {
                       onUpdateOverlay(selectedOverlay.id, {
                         style: {
                           ...selectedOverlay.style,
                           color: event.target.value,
                         },
                       })
-                    }
+                      onSaveOverlay(selectedOverlay.id)
+                    }}
                   />
                 </label>
                 <label className="field">
@@ -102,14 +105,15 @@ function OverlayControls({
                     min="10"
                     max="64"
                     value={selectedOverlay.style.fontSize}
-                    onChange={(event) =>
+                    onChange={(event) => {
                       onUpdateOverlay(selectedOverlay.id, {
                         style: {
                           ...selectedOverlay.style,
                           fontSize: Number(event.target.value),
                         },
                       })
-                    }
+                    }}
+                    onBlur={() => onSaveOverlay(selectedOverlay.id)}
                   />
                 </label>
               </>

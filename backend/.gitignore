@@ -34,3 +34,4 @@ htmlcov/
 Thumbs.db
 
 /streams
+/requirements.txt

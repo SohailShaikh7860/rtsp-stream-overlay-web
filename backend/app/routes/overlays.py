@@ -13,7 +13,7 @@ def get_overlays():
     overlays = overlay_service.get_all_overlays()
     return jsonify(overlays)
 
-@overlay_bp.route('/api/overlays/<int:overlay_id>', methods=['GET'])
+@overlay_bp.route('/api/overlays/<overlay_id>', methods=['GET'])
 def get_overlay(overlay_id):
     """Get a single overlay by ID"""
     overlay = overlay_service.get_overlay_by_id(overlay_id)
@@ -33,7 +33,7 @@ def create_overlay():
     overlay = overlay_service.create_overlay(data)
     return jsonify(overlay), 201
 
-@overlay_bp.route('/api/overlays/<int:overlay_id>', methods=['PUT'])
+@overlay_bp.route('/api/overlays/<overlay_id>', methods=['PUT'])
 def update_overlay(overlay_id):
     """Update an existing overlay"""
     data = request.get_json()
@@ -43,7 +43,7 @@ def update_overlay(overlay_id):
         return jsonify(overlay)
     return jsonify({'error': 'Overlay not found'}), 404
 
-@overlay_bp.route('/api/overlays/<int:overlay_id>', methods=['DELETE'])
+@overlay_bp.route('/api/overlays/<overlay_id>', methods=['DELETE'])
 def delete_overlay(overlay_id):
     """Delete an overlay"""
     success = overlay_service.delete_overlay(overlay_id)
