@@ -9,26 +9,27 @@ function PlaybackControls({
   onStopStream,
   streamStatus,
   streamError,
+  videoUrl,
+  canPlay,
 }) {
   const handleRtspChange = (event) => {
     setRtspUrl(event.target.value)
   }
 
-  const handleHlsChange = (event) => {
-    setHlsUrl(event.target.value)
-  }
 
   const handlePlay = () => {
-    if (videoRef?.current) {
+    if (videoRef?.current && videoUrl) {
       videoRef.current.play()
     }
   }
 
   const handlePause = () => {
-    if (videoRef?.current) {
+    if (videoRef?.current && videoUrl) {
       videoRef.current.pause()
     }
   }
+
+  const isReady = Boolean(videoUrl) && canPlay
 
   return (
     <section className="card">
@@ -47,20 +48,14 @@ function PlaybackControls({
           Convert RTSP &amp; Play
         </button>
 
-        <label className="field">
-          <span>HLS URL (optional)</span>
-          <input
-            type="text"
-            value={hlsUrl}
-            onChange={handleHlsChange}
-            placeholder="https://example.com/stream.m3u8"
-          />
-        </label>
-        <button onClick={onLoadHls}>Load HLS URL</button>
 
         <div className="button-row">
-          <button onClick={handlePlay}>Play</button>
-          <button onClick={handlePause}>Pause</button>
+          <button onClick={handlePlay} disabled={!isReady}>
+            Play
+          </button>
+          <button onClick={handlePause} disabled={!isReady}>
+            Pause
+          </button>
           <button className="ghost" onClick={onStopStream}>
             Stop Stream
           </button>

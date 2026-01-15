@@ -19,6 +19,7 @@ function App() {
   const [streamId, setStreamId] = useState(null)
   const [streamStatus, setStreamStatus] = useState('idle')
   const [streamError, setStreamError] = useState('')
+  const [canPlay, setCanPlay] = useState(false)
 
   const [overlays, setOverlays] = useState([])
   const [selectedId, setSelectedId] = useState(null)
@@ -90,26 +91,125 @@ function App() {
       return
     }
 
+    setStreamError('')
+    setCanPlay(false)
+
     if (hlsRef.current) {
       hlsRef.current.destroy()
       hlsRef.current = null
     }
 
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = videoUrl
-      return
+    const handleVideoError = (event) => {
+      const error = video.error
+      const errorDetails = {
+        code: error?.code,
+        message: error?.message,
+        type: error?.code === 1 ? 'MEDIA_ERR_ABORTED' :
+              error?.code === 2 ? 'MEDIA_ERR_NETWORK' :
+              error?.code === 3 ? 'MEDIA_ERR_DECODE' :
+              error?.code === 4 ? 'MEDIA_ERR_SRC_NOT_SUPPORTED' : 'UNKNOWN',
+        videoUrl,
+        videoSrc: video.src,
+      }
+      console.error('Video element error:', errorDetails)
+      
+      const errorMsg = error
+        ? `Video error (${errorDetails.type}): ${error.message || 'Code ' + error.code}`
+        : 'Video playback failed.'
+      setStreamError(errorMsg)
+      setCanPlay(false)
     }
 
+    video.addEventListener('error', handleVideoError)
+
     if (Hls.isSupported()) {
-      const hls = new Hls({ lowLatencyMode: true })
+      const hls = new Hls({
+        debug: false,
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 90,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        maxBufferSize: 60 * 1000 * 1000,
+        maxBufferHole: 0.5,
+        highBufferWatchdogPeriod: 2,
+        nudgeOffset: 0.1,
+        nudgeMaxRetry: 3,
+        maxFragLookUpTolerance: 0.25,
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 10,
+        manifestLoadingTimeOut: 10000,
+        manifestLoadingMaxRetry: 3,
+        levelLoadingTimeOut: 10000,
+        levelLoadingMaxRetry: 3,
+        fragLoadingTimeOut: 20000,
+        fragLoadingMaxRetry: 3,
+      })
+      
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+
+        if (data.fatal || data.details !== 'bufferStalledError') {
+          console.error('HLS.js error:', {
+            type: data.type,
+            details: data.details,
+            fatal: data.fatal,
+            error: data.error,
+            url: data.url,
+          })
+        }
+        
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              console.log('Network error, attempting recovery...')
+              setStreamError(`Network error: ${data.details}`)
+              hls.startLoad()
+              break
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.log('Media error, attempting recovery...')
+              setStreamError(`Media error: ${data.details}`)
+              hls.recoverMediaError()
+              break
+            default:
+              setStreamError(
+                `HLS Error: ${data.type} - ${data.details || 'Stream failed'}`,
+              )
+              setCanPlay(false)
+              hls.destroy()
+              break
+          }
+        }
+      })
+      
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log('HLS manifest parsed successfully')
+        setCanPlay(true)
+        setStreamError('')
+        video.play().catch((err) => {
+          console.warn('Auto-play blocked:', err.message)
+        })
+      })
+      
       hls.loadSource(videoUrl)
       hls.attachMedia(video)
       hlsRef.current = hls
-    } else {
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+
+      console.log('Using native HLS support')
       video.src = videoUrl
+      const handleLoaded = () => setCanPlay(true)
+      video.addEventListener('loadedmetadata', handleLoaded)
+      return () => {
+        video.removeEventListener('error', handleVideoError)
+        video.removeEventListener('loadedmetadata', handleLoaded)
+      }
+    } else {
+      setStreamError('HLS playback is not supported in this browser.')
+      setCanPlay(false)
     }
 
     return () => {
+      video.removeEventListener('error', handleVideoError)
       if (hlsRef.current) {
         hlsRef.current.destroy()
         hlsRef.current = null
@@ -247,6 +347,8 @@ function App() {
               onStopStream={stopStream}
               streamStatus={streamStatus}
               streamError={streamError}
+              videoUrl={videoUrl}
+              canPlay={canPlay}
             />
 
             <VideoStage
