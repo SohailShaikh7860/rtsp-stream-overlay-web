@@ -216,3 +216,7 @@ curl -X POST http://localhost:5000/api/overlays \
 - Verify MongoDB connection in backend logs
 - Check browser console for API errors
 - Ensure `.env` file exists with valid URI
+
+## Demo Video
+
+https://youtu.be/qRZnPrajLOM

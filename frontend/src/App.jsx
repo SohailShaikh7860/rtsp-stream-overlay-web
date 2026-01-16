@@ -414,7 +414,7 @@ function App() {
             <p className="eyebrow">RTSP Livestream Studio</p>
             <h1>RTSP Livestream with Overlays</h1>
             <p className="subtitle">
-              Play RTSP feeds via backend conversion or a provided HLS URL, then
+              Play RTSP feeds via provided HLS URL, then
               layer text or image overlays on top.
             </p>
           </div>
